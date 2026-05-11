@@ -59,19 +59,19 @@ _____________________________________________________________________________
 
 ПОРЯДОК ВЫПОЛНЕНИЯ:
 1. ISP (scr1) → HQ-RTR (scr2) → BR-RTR (scr3) → HQ-SRV (scr4) → BR-SRV (scr5) → HQ-CLI (scr6)
-2. SSH: ssh1 на HQ-RTR и BR-RTR, ssh2 на HQ-SRV и BR-SRV
+2. SSH: ssh1 на HQ-RTR и BR-RTR, ssh2 на HQ-SRV и BR-SRV и HQ-CLI
 3. FRR/OSPF: frr на HQ-RTR, frr на BR-RTR
 4. Docker: docker на BR-SRV
 5. Samba: samba на BR-SRV
 6. Chrony: chrony на ISP, затем на остальных
 7. Ansible: ansible на BR-SRV
 8. RAID: raid на HQ-SRV
-9. CA: ca на HQ-SRV
+9. CERTIFICATE: ca на HQ-SRV
 10. rsyslog: rsyslog на HQ-SRV, rsyslog_cli на HQ-RTR/BR-RTR/BR-SRV
 _____________________________________________________________________________
 
 Если конфиги выдают ошибки из за сети на машинах HQ-RTR, HQ-SRV, HQ-CLI, то
-нужно ПЕРЕД запуском конфига - выполнить следющую команду:
+нужно ПЕРЕД перезапуском конфига - выполнить следющую команду:
 
 (КОПИРУЙ ВСЕ ВМЕСТЕ)
 
@@ -454,7 +454,6 @@ echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
 
 # Билет: Настройте внутреннюю динамическую маршрутизацию (frr) для туннелей.
 # Протокол: OSPFv2
-# ВАЖНО: Выполнять ПОСЛЕ создания GRE-туннелей!
                                                            
 ________________________________HQ-RTR__________________________________________
 
