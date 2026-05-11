@@ -70,7 +70,8 @@ _____________________________________________________________________________
 10. rsyslog: rsyslog на HQ-SRV, rsyslog_cli на HQ-RTR/BR-RTR/BR-SRV
 _____________________________________________________________________________
 
-Если конфиги выдают ошибки из за сети на машинах HQ-RTR, HQ-SRV, HQ-CLI, то
+Если конфиги выдают ошибки как [Temporary failure in name resolution]
+из за сети на машинах HQ-RTR, HQ-SRV, HQ-CLI, то
 нужно ПЕРЕД перезапуском конфига - выполнить следющую команду:
 
 (КОПИРУЙ ВСЕ ВМЕСТЕ)
@@ -196,7 +197,7 @@ echo -e "\e[35m=== НАСТРОЙКА ТУННЕЛЕЙ ===\e[0m"
 #TUNNEL
 mkdir /etc/net/ifaces/iptunnel
 
-echo 10.0.0.1/28 > /etc/net/ifaces/iptunnel/ipv4address
+echo "10.0.0.1/28" > /etc/net/ifaces/iptunnel/ipv4address
 echo "TYPE=iptun
 TUNTYPE=gre
 DISABLED=no
@@ -272,7 +273,7 @@ echo -e "\e[35m=== НАСТРОЙКА ТУННЕЛЕЙ ===\e[0m"
 #TUNNEL
 mkdir /etc/net/ifaces/iptunnel
 
-echo 10.0.0.2/28 > /etc/net/ifaces/iptunnel/ipv4address
+echo "10.0.0.2/28" > /etc/net/ifaces/iptunnel/ipv4address
 echo "TYPE=iptun
 TUNTYPE=gre
 DISABLED=no
@@ -452,8 +453,8 @@ echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
 ██▄▄   ██▄▄██▄ ██▄▄██▄    █    ██  ██ ▀▀▀▄▄▄ ██▄▄█▀ ██▄▄   
 ██     ██   ██ ██   ██   █     ▀████▀ █████▀ ██     ██     
 
-# Билет: Настройте внутреннюю динамическую маршрутизацию (frr) для туннелей.
-# Протокол: OSPFv2
+Сначала запустить конфиг frr потом прописать команды снизу или же скопировать и
+вставить. (Чтобы выйти из 'vtysh' - выполнить команду 'ex')
                                                            
 ________________________________HQ-RTR__________________________________________
 
