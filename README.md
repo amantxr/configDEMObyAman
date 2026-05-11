@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="banner.png" width="100%">
+  <img src="banner.png" width="75%">
 </p>
 
 Скачать полный TXT конфиг
