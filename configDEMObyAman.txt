@@ -36,7 +36,7 @@
 ██▀▀▀ ██▀██ ███▄██ ██▄▄  ██ ██ ▄▄   ██▄██ ▀███▀   ██▄▄██ ██▀▄▀██ ██▀██ ███▄██ 
 ▀████ ▀███▀ ██ ▀██ ██    ██ ▀███▀   ██▄█▀   █     ██  ██ ██   ██ ██▀██ ██ ▀██ 
 
-version 3.0 / 11 May.2026 / 19:25
+version 3.1 / 11 May.2026 / 22:51
 IP/NAT/DNS/GRETUNNEL/SSH/FRR/DOCKER/SAMBA/CHRONY/ANSIBLE/RAID5/CERTIFICATE/RSYSLOG
 _____________________________________________________________________________
 
@@ -48,9 +48,9 @@ _____________________________________________________________________________
 ручное участие: например SSH и Ansible могут попросить ввести пароль или написать yes для подтверждения 
 подключения, а FRR/OSPF нужно будет вставить готовые команды маршрутизации через vtysh. В остальном вся
 рутинная часть уже подготовлена за вас. После настройки можно запустить full_check.sh, который автоматически
-проверит работу основных сервисов и покажет готов ли стенд к сдаче.
+проверит работу основных сервисов и покажет готов ли стенд к сдаче. Удачи! 
 
-(C) Удачи! Твой дружелюбный одногруппник aman :)
+(C) Твой дружелюбный одногруппник aman :)
 _____________________________________________________________________________
 
 Перед самым ПЕРВЫМ запуском любого конфига прописать chmod +x имя_конфига а чтобы
@@ -213,7 +213,7 @@ echo -e "\e[35m=== ПРОВЕРКА ТУННЕЛЕЙ ===\e[0m"
 ip tunnel show
 echo -e "\e[35m=== УСТАНОВКА DNSMASQ ===\e[0m"
 apt-get install dnsmasq
-echo "dhcp-range=192.168.2.1,192.168.2.15,999h
+echo "dhcp-range=192.168.2.10,192.168.2.15,999h
 dhcp-option=3,192.168.2.1
 dhcp-option=6,192.168.1.2
 dhcp-option=15,au-team.irpo
@@ -221,11 +221,12 @@ interface=ens19.200" > /etc/dnsmasq.conf
 
 systemctl restart dnsmasq
 
+
+echo "nameserver 8.8.8.8" > /etc/resolv.conf
 echo -e "\e[35m=== ПРОВЕРКА ИНТЕРФЕЙСОВ И ПИНГ ===\e[0m"
 ip -c -br a
 ping -c 4 8.8.8.8
 ping -c 4 ya.ru
-
 
 echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
 timedatectl set-timezone Asia/Krasnoyarsk
@@ -721,7 +722,7 @@ br-rtr ansible_host=192.168.3.1 ansible_port=2026 ansible_user=net_admin
 
 [servers]
 hq-srv ansible_host=192.168.1.2 ansible_port=2026 ansible_user=sshuser
-hq-cli ansible_host=192.168.2.2 ansible_port=2026 ansible_user=sshuser
+hq-cli ansible_host=192.168.2.10 ansible_port=2026 ansible_user=sshuser
 EOF
 
 cat > /etc/ansible/ansible.cfg <<EOF
@@ -742,7 +743,7 @@ echo -e "\e[35m===КОПИРОВАНИЕ SSH КЛЮЧЕЙ===\e[0m"
 
 ssh-copy-id -p 2026 net_admin@192.168.1.1
 ssh-copy-id -p 2026 sshuser@192.168.1.2
-ssh-copy-id -p 2026 sshuser@192.168.2.2
+ssh-copy-id -p 2026 sshuser@192.168.2.10
 ssh-copy-id -p 2026 net_admin@192.168.3.1
 
 echo -e "\e[35m===ПРОВЕРКА ANSIBLE===\e[0m"
@@ -844,7 +845,7 @@ openssl req -new -key web.key -out web.csr \
 openssl x509 -req -in web.csr -CA ca.crt -CAkey ca.key \
   -CAcreateserial -out web.crt -days 365 -sha256 -extfile web.ext
 
-scp -P 2026 ca.crt sshuser@192.168.2.2:/tmp/ca.crt
+scp -P 2026 ca.crt sshuser@192.168.2.10:/tmp/ca.crt
 
 echo -e "\e[1;32m=== CA И WEB-СЕРТИФИКАТ ГОТОВЫ ===\e[0m"
 
@@ -933,7 +934,7 @@ INFO="${BLUE}[INFO]${NC}"
 
 HQ_RTR="192.168.1.1"
 HQ_SRV="192.168.1.2"
-HQ_CLI="192.168.2.2"
+HQ_CLI="192.168.2.10"
 BR_RTR="192.168.3.1"
 BR_SRV="192.168.3.2"
 ISP_NTP="192.168.44.7"
@@ -1046,6 +1047,10 @@ echo -e "${YELLOW}Если напротив всех пунктов [ OK ], ст
 
 
 __________________________________HQ-SRV_____________________________________
+(Перед запуском ЭТОГО конфига прописать следующие команды на HQ-RTR, BR-RTR и BR-SRV:
+logger -n 192.168.1.2 -P 514 -d "TEST FROM HQ-RTR"
+logger -n 192.168.1.2 -P 514 -d "TEST FROM BR-RTR"
+logger -n 192.168.1.2 -P 514 -d "TEST FROM BR-SRV"
 
 nano full_check
 
