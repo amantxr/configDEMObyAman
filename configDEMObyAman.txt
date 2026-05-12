@@ -887,9 +887,15 @@ cat > /etc/rsyslog.d/remote-server.conf <<'EOF'
 $ModLoad imudp
 $UDPServerRun 514
 
-$template RemoteLogs,"/var/log/remote/%HOSTNAME%/%PROGRAMNAME%.log"
-*.* ?RemoteLogs
+$template RemoteLogs,"/var/log/remote/%FROMHOST%/%PROGRAMNAME%.log"
+
+:fromhost-ip, !isequal, "127.0.0.1" ?RemoteLogs
+& stop
 EOF
+
+systemctl restart rsyslog
+rm -rf /var/log/remote/*
+mkdir -p /var/log/remote
 
 systemctl enable --now rsyslog
 systemctl restart rsyslog
@@ -1061,11 +1067,16 @@ echo -e "${GREEN}=== ПРОВЕРКА ЗАВЕРШЕНА ===${NC}"
 echo -e "${YELLOW}Если напротив всех пунктов [ OK ], стенд готов к сдаче.${NC}"
 
 
-__________________________________HQ-SRV_____________________________________
-(Перед запуском ЭТОГО конфига прописать следующие команды на HQ-RTR, BR-RTR и BR-SRV:
+_____________________________________________________________________________
+
+██████████████ ! (Перед запуском конфига ниже, прописать следующие команды на HQ-RTR, BR-RTR и BR-SRV,
+и затем запускать full_check конфиг. Иначе в проверке rsyslog в пунктах logs будет ошибка.
+
 logger -n 192.168.1.2 -P 514 -d "TEST FROM HQ-RTR"
 logger -n 192.168.1.2 -P 514 -d "TEST FROM BR-RTR"
 logger -n 192.168.1.2 -P 514 -d "TEST FROM BR-SRV"
+
+__________________________________HQ-SRV_____________________________________
 
 nano full_check
 
@@ -1119,7 +1130,7 @@ check "rsyslog service" "systemctl is-active rsyslog"
 check "rsyslog listens UDP 514" "ss -ulnp | grep ':514'"
 check "remote log directory exists" "test -d /var/log/remote"
 check "HQ-RTR logs exist" "find /var/log/remote -type f | grep hq-rtr"
-check "BR-RTR logs exist" "find /var/log/remote -type f | grep br-rtr"
+check "BR-RTR logs exist" "grep -R 'BR-RTR' /var/log/remote >/dev/null"
 check "BR-SRV logs exist" "find /var/log/remote -type f | grep br-srv"
 check "TEST messages exist" "grep -R TEST /var/log/remote >/dev/null"
 
