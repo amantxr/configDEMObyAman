@@ -36,7 +36,7 @@
 ██▀▀▀ ██▀██ ███▄██ ██▄▄  ██ ██ ▄▄   ██▄██ ▀███▀   ██▄▄██ ██▀▄▀██ ██▀██ ███▄██ 
 ▀████ ▀███▀ ██ ▀██ ██    ██ ▀███▀   ██▄█▀   █     ██  ██ ██   ██ ██▀██ ██ ▀██ 
 
-version 3.1 / 11 May.2026 / 22:51
+version 3.5 / 12 May.2026 / 14:21
 IP/NAT/DNS/GRETUNNEL/SSH/FRR/DOCKER/SAMBA/CHRONY/ANSIBLE/RAID5/CERTIFICATE/RSYSLOG
 _____________________________________________________________________________
 
@@ -294,6 +294,11 @@ echo "nameserver 8.8.8.8" > /etc/resolv.conf
 timedatectl set-timezone Asia/Krasnoyarsk
 hostnamectl hostname br-rtr.au-team.irpo; exec bash
 
+______________________________________________________________________________
+
+██████████████ ! ПЕРЕД ЗАПУСКОМ не забыть прописать адрес HQ-CLI (в конфиге отмечен как 192.168.2.█),
+чтобы проверить какой адрес получил HQ-CLI, выполнить команду 'ip -c -br a' на hq-cli.
+
 _________________________________HQ-SRV_______________________________________
 
 nano scr4
@@ -335,8 +340,8 @@ ptr-record=1.3.168.192.in-addr.arpa,br-rtr.au-team.irpo
 address=/hq-srv.au-team.irpo/192.168.1.2
 ptr-record=2.1.168.192.in-addr.arpa,hq-srv.au-team.irpo
 
-address=/hq-cli.au-team.irpo/192.168.2.2
-ptr-record=2.2.168.192.in-addr.arpa,hq-cli.au-team.irpo
+address=/hq-cli.au-team.irpo/192.168.2.█
+ptr-record=█.2.168.192.in-addr.arpa,hq-cli.au-team.irpo
 
 address=/br-srv.au-team.irpo/192.168.3.2
 ptr-record=2.3.168.192.in-addr.arpa,br-srv.au-team.irpo" > /etc/dnsmasq.conf
@@ -700,6 +705,9 @@ echo -e "\e[1;32m=== ГОТОВО!!! ===\e[0m"
 
 # После запуска конфига, у вас попросит потдверждение 'yes' вести пароль: P@ssw0rd 
 
+██████████████ ! ПЕРЕД ЗАПУСКОМ не забыть прописать адрес HQ-CLI (в конфиге отмечен как 192.168.2.█),
+чтобы проверить какой адрес получил HQ-CLI, выполнить команду 'ip -c -br a' на hq-cli.
+
 ______________________________________BR-SRV____________________________________
 
 nano ansible
@@ -722,7 +730,7 @@ br-rtr ansible_host=192.168.3.1 ansible_port=2026 ansible_user=net_admin
 
 [servers]
 hq-srv ansible_host=192.168.1.2 ansible_port=2026 ansible_user=sshuser
-hq-cli ansible_host=192.168.2.10 ansible_port=2026 ansible_user=sshuser
+hq-cli ansible_host=192.168.2.█ ansible_port=2026 ansible_user=sshuser
 EOF
 
 cat > /etc/ansible/ansible.cfg <<EOF
@@ -743,7 +751,7 @@ echo -e "\e[35m===КОПИРОВАНИЕ SSH КЛЮЧЕЙ===\e[0m"
 
 ssh-copy-id -p 2026 net_admin@192.168.1.1
 ssh-copy-id -p 2026 sshuser@192.168.1.2
-ssh-copy-id -p 2026 sshuser@192.168.2.10
+ssh-copy-id -p 2026 sshuser@192.168.2.█
 ssh-copy-id -p 2026 net_admin@192.168.3.1
 
 echo -e "\e[35m===ПРОВЕРКА ANSIBLE===\e[0m"
@@ -814,6 +822,10 @@ echo -e "\e[1;32m=== ГОТОВО RAID 5 ===\e[0m"
 
 # Билет: Сертификаты на 365 дней, доверие для HQ-CLI, сертификаты для веб-серверов
 # После запуска конфига, у вас попросит вести пароль: P@ssw0rd 
+
+██████████████ ! ПЕРЕД ЗАПУСКОМ не забыть прописать адрес HQ-CLI (в конфиге отмечен как 192.168.2.█),
+чтобы проверить какой адрес получил HQ-CLI, выполнить команду 'ip -c -br a' на hq-cli.
+
                                          
 _________________________________HQ-SRV________________________________________
 
@@ -845,7 +857,7 @@ openssl req -new -key web.key -out web.csr \
 openssl x509 -req -in web.csr -CA ca.crt -CAkey ca.key \
   -CAcreateserial -out web.crt -days 365 -sha256 -extfile web.ext
 
-scp -P 2026 ca.crt sshuser@192.168.2.10:/tmp/ca.crt
+scp -P 2026 ca.crt sshuser@192.168.2.█:/tmp/ca.crt
 
 echo -e "\e[1;32m=== CA И WEB-СЕРТИФИКАТ ГОТОВЫ ===\e[0m"
 
@@ -913,7 +925,10 @@ echo "Проверка: /usr/local/bin/send-test-log.sh"
 ██    ▀███▀ ██▄▄▄ ██▄▄▄   ▀████ ██ ██ ██▄▄▄ ▀████ ██ ██ 
 
 Запускаете этот конфиг после всех настроек, на машине BR-SRV и HQ-SRV Конфиг позволяет
-узнать подробно и сразу верно ли все работает.
+узнать подробно и сразу верно ли все работает. 
+
+██████████████ ! ПЕРЕД ЗАПУСКОМ не забыть прописать адрес HQ-CLI (в конфиге отмечен как 192.168.2.█),
+чтобы проверить какой адрес получил HQ-CLI, выполнить команду 'ip -c -br a' на hq-cli.
 
 __________________________________BR-SRV_____________________________________
 
@@ -934,7 +949,7 @@ INFO="${BLUE}[INFO]${NC}"
 
 HQ_RTR="192.168.1.1"
 HQ_SRV="192.168.1.2"
-HQ_CLI="192.168.2.10"
+HQ_CLI="192.168.2.█"
 BR_RTR="192.168.3.1"
 BR_SRV="192.168.3.2"
 ISP_NTP="192.168.44.7"
