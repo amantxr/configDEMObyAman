@@ -422,6 +422,9 @@ echo -e "\e[35m=== ПРОВЕРКА ИНТЕРФЕЙСОВ И ПИНГ ===\e[0m"
 ip -c -br a
 ping -c 4 ya.ru
 echo -e "\e[35m=== УСТАНОВКА DNSMASQ ===\e[0m"
+
+echo "nameserver 8.8.8.8
+nameserver 192.168.1.2" > /etc/resolv.conf
 apt-get update
 apt-get install dnsmasq
 echo "no-resolv
@@ -447,6 +450,7 @@ echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
 echo -e "\e[35m===НАСТРОЙКА SSH===\e[0m"
 useradd -m sshuser
 passwd sshuser
+
 apt-get update -y
 apt-get install -y openssh-server
 echo "Authorized access only" > /etc/openssh/banner
@@ -460,6 +464,7 @@ systemctl enable --now sshd
 systemctl restart sshd
 echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
 echo -e "\e[35m===УСТАНОВКА CHRONY===\e[0m"
+
 apt-get update
 apt-get install -y chrony
 cat > /etc/chrony.conf <<EOF
