@@ -25,8 +25,8 @@ WMMm__,-'.'     /      _.\      F"""-+,,   ;_,_.dMMMMMMMM[,_ / `=_}
 2. Вставляешь туда конфиг CTRL+SHIFT+V, сохраняешь CTRL+O CTRL+X , выдаёшь права chmod +x configX и запускаешь ./configX.
 3. Выполняй конфиги строго по порядку:
 		ISP — config1,	
-		HQ-RTR — config2, <----после systemctl restart network !!!
-		BR-RTR — config3,  <----после systemctl restart network !!!
+		HQ-RTR — config2, <---- запускать 2 раза!!!
+		BR-RTR — config3,  <---- запускать 2 раза!!!
 		HQ-CLI — config4,
 		HQ-SRV — config5,
 		BR-SRV — config6.
