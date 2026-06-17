@@ -396,6 +396,20 @@ systemctl restart chronyd
 chronyc tracking
 chronyc sources -v
 echo -e "\e[1;32m=== ГОТОВО!!! ===\e[0m"
+
+echo -e "\e[35m=== УСТАНОВКА ЯНДЕКС БРАУЗЕРА ===\e[0m"
+echo "nameserver 8.8.8.8
+nameserver 192.168.1.2" > /etc/resolv.conf
+
+apt-get update
+apt-get install -y yandex-browser-stable
+
+echo -e "\e[35m=== ПРОВЕРКА ЯНДЕКС БРАУЗЕРА ===\e[0m"
+rpm -q yandex-browser-stable
+yandex-browser-stable --version 2>/dev/null || true
+
+echo -e "\e[1;32m=== ГОТОВО ЯНДЕКС БРАУЗЕР ===\e[0m"
+
 timedatectl set-timezone Asia/Krasnoyarsk
 hostnamectl hostname hq-cli.au-team.irpo; exec bash
 
@@ -537,8 +551,59 @@ mkdir -p /var/log/remote
 systemctl enable --now rsyslog
 systemctl restart rsyslog
 echo -e "\e[1;32m=== ГОТОВО RSYSLOG SERVER ===\e[0m"
+echo -e "\e[35m=== НАСТРОЙКА NFS-СЕРВЕРА ===\e[0m"
+apt-get update
+apt-get install -y nfs-server nfs-utils 2>/dev/null || apt-get install -y nfs-server
+mkdir -p /raid5/nfs
+chmod 777 /raid5/nfs
+echo "NFS TEST FILE FROM HQ-SRV" > /raid5/nfs/test.txt
+cat > /etc/exports <<'EOF'
+/raid5/nfs 192.168.2.0/24(rw,sync,no_subtree_check,no_root_squash)
+/raid5/nfs 192.168.1.0/27(rw,sync,no_subtree_check,no_root_squash)
+EOF
+
+exportfs -ra
+systemctl enable --now nfs-server 2>/dev/null || systemctl enable --now nfs
+systemctl restart nfs-server 2>/dev/null || systemctl restart nfs
+
+echo -e "\e[35m=== ПРОВЕРКА NFS ===\e[0m"
+exportfs -v
+showmount -e 127.0.0.1 2>/dev/null || true
+echo -e "\e[1;32m=== ГОТОВО NFS SERVER ===\e[0m"
+
+
+echo -e "\e[35m=== НАСТРОЙКА WEB-ПРИЛОЖЕНИЯ НА HQ-SRV ===\e[0m"
+apt-get update
+apt-get install -y apache2 php php-apache2 2>/dev/null || apt-get install -y apache2
+
+mkdir -p /var/www/html
+
+cat > /var/www/html/index.html <<'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>HQ-SRV WEB</title>
+</head>
+<body>
+    <h1>WEB application on HQ-SRV</h1>
+    <p>Demo Exam 2026 - 09.02.06</p>
+    <p>Server: hq-srv.au-team.irpo</p>
+</body>
+</html>
+EOF
+
+systemctl enable --now httpd2 2>/dev/null || systemctl enable --now apache2
+systemctl restart httpd2 2>/dev/null || systemctl restart apache2
+
+echo -e "\e[35m=== ПРОВЕРКА WEB ===\e[0m"
+curl -I http://127.0.0.1 2>/dev/null || true
+curl http://hq-srv.au-team.irpo 2>/dev/null || true
+echo -e "\e[1;32m=== ГОТОВО WEB APPLICATION ===\e[0m"
+
 timedatectl set-timezone Asia/Krasnoyarsk
 hostnamectl hostname hq-srv.au-team.irpo; exec bash
+
  
 ▄▄▄▄  ▄▄▄▄       ▄▄▄▄ ▄▄▄▄  ▄▄ ▄▄ 
 ██▄██ ██▄█▄ ▄▄▄ ███▄▄ ██▄█▄ ██▄██ 
