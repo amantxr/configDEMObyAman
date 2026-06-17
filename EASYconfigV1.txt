@@ -1,0 +1,947 @@
+﻿                                               ,w.
+                                             ,YWMMw  ,M  ,
+                        _.---.._   __..---._.'MMMMMw,wMWmW,
+                   _.-""        """           YP"WMMMMMMMMMb,
+                .-' __.'                   .'     MMMMW^WMMMM;
+    _,        .'.-'"; `,       /`     .--""      :MMM[==MWMW^;
+ ,mM^"     ,-'.'   /   ;      ;      /   ,       MMMMb_wMW"  @\
+,MM:.    .'.-'   .'     ;     `\    ;     `,     MMMMMMMW `"=./`-,
+WMMm__,-'.'     /      _.\      F"""-+,,   ;_,_.dMMMMMMMM[,_ / `=_}
+"^MP__.-'    ,-' _.--""   `-,   ;       \  ; ;MMMMMMMMMMW^``; __|
+           /   .'            ; ;         )  )`{  \ `"^W^`,   \  :
+          /  .'             /  (       .'  /     Ww._     `.  `"
+         /  Y,              `,  `-,=,_{   ;      MMMP`""-,  `-._.-,
+        (--, )                `,_ / `) \/"")      ^"      `-, -;"\:
+         `"""                    `"""   `"'                  `---"                                
+                                                              
+██████  ▄▄▄   ▄▄▄▄ ▄▄ ▄▄   ▄█████  ▄▄▄  ▄▄  ▄▄ ▄▄▄▄▄ ▄▄  ▄▄▄▄ 
+██▄▄   ██▀██ ███▄▄ ▀███▀   ██     ██▀██ ███▄██ ██▄▄  ██ ██ ▄▄ 
+██▄▄▄▄ ██▀██ ▄▄██▀   █     ▀█████ ▀███▀ ██ ▀██ ██    ██ ▀███▀ v1.0
+                                                              
+Это упрощенный конфиг ранее 'configDEMObyAman', тут настолько все просто что
+всего 6 конфигов вместо 33, действий всего 35 вместо 216. Порядок простой:
+
+1. На каждой машине создаёшь нужный файл через nano configX (X - это порядковый номер)
+2. Вставляешь туда конфиг CTRL+SHIFT+V, сохраняешь CTRL+O ENTER CTRL+X , выдаёшь права chmod +x configX и запускаешь ./configX.
+3. Выполняй конфиги строго по порядку:
+		ISP — config1,	
+		HQ-RTR — config2, <---- запускать 2 раза!!!
+		BR-RTR — config3,  <---- запускать 2 раза!!!
+		HQ-CLI — config4,
+		HQ-SRV — config5,
+		BR-SRV — config6.
+4. В некоторых конфигах будешь встречать ---> ███████ <--- это надо стереть и написать адрес HQ-CLI
+5. А чтобы узнать адрес HQ-CLI, нужно ПОСЛЕ настройки HQ-RTR, написать в консоли HQ-CLI ---> ip -c -br a
+6. В процессе SSH попросит ввести пароль для пользователей — везде используй P@ssw0rd.
+7. После основных конфигов будет настройка OSPF, на HQ-RTR и BR-RTR просто вставить в консоль
+   готовые команды из инструкции. В конце запускаются проверки (конфиг full_check).
+
+▄▄  ▄▄▄▄ ▄▄▄▄  
+██ ███▄▄ ██▄█▀ 
+██ ▄▄██▀ ██    
+________________________________________________________________________                                                                                                                             
+nano config1
+
+
+
+#!/bin/bash
+echo -e "\e[35m===НАСТРОЙКА ИНТЕРФЕЙСОВ===\e[0m"
+mkdir /etc/net/ifaces/ens18
+echo "BOOTPROTO=dhcp
+TYPE=eth
+DISABLED=no
+CONFIG_IPV4=yes" > /etc/net/ifaces/ens18/options
+mkdir /etc/net/ifaces/ens19
+echo "BOOTPROTO=static
+TYPE=eth
+DISABLED=no
+CONFIG_IPV4=yes" > /etc/net/ifaces/ens19/options
+echo 172.16.1.1/28 > /etc/net/ifaces/ens19/ipv4address
+mkdir /etc/net/ifaces/ens20
+echo "BOOTPROTO=static
+TYPE=eth
+DISABLED=no
+CONFIG_IPV4=yes" > /etc/net/ifaces/ens20/options
+echo 172.16.2.1/28 > /etc/net/ifaces/ens20/ipv4address
+sed -i "s/net.ipv4.ip_forward = 0/net.ipv4.ip_forward = 1/" "/etc/net/sysctl.conf"
+systemctl restart network
+echo -e "\e[35m=== ПРОВЕРКА ИНТЕРФЕЙСОВ И ПИНГ ===\e[0m"
+ip -c -br a
+ping -c 4 8.8.8.8
+ping -c 4 ya.ru
+echo -e "\e[35m=== УСТАНОВКА IPTABLES ===\e[0m"
+apt-get update
+apt-get install iptables -y
+iptables -t nat -F
+iptables -t nat -A POSTROUTING -s 172.16.1.0/28 -o ens18 -j MASQUERADE
+iptables -t nat -A POSTROUTING -s 172.16.2.0/28 -o ens18 -j MASQUERADE
+iptables-save > /etc/sysconfig/iptables
+systemctl restart iptables
+systemctl enable --now iptables
+echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
+echo -e "\e[35m===УСТАНОВКА CHRONY===\e[0m"
+apt-get update
+apt-get install -y chrony
+ip addr add 192.168.44.7/32 dev lo 2>/dev/null || true
+mkdir -p /etc/net/ifaces/lo
+grep -q "192.168.44.7/32" /etc/net/ifaces/lo/ipv4address 2>/dev/null || \
+echo "192.168.44.7/32" >> /etc/net/ifaces/lo/ipv4address
+cat > /etc/chrony.conf <<EOF
+driftfile /var/lib/chrony/drift
+local stratum 5
+allow 192.168.0.0/16
+allow 172.16.0.0/12
+allow 10.0.0.0/8
+bindaddress 0.0.0.0
+makestep 1.0 3
+rtcsync
+EOF
+systemctl enable --now chronyd
+systemctl restart chronyd
+chronyc tracking
+chronyc sources -v
+echo -e "\e[1;32m=== ГОТОВО!!! ===\e[0m"
+echo "nameserver 8.8.8.8" > /etc/resolv.conf
+timedatectl set-timezone Asia/Krasnoyarsk
+hostnamectl hostname isp.au-team.irpo; exec bash
+   
+▄▄ ▄▄  ▄▄▄      ▄▄▄▄  ▄▄▄▄▄▄ ▄▄▄▄  
+██▄██ ██▀██ ▄▄▄ ██▄█▄   ██   ██▄█▄ 
+██ ██ ▀███▀     ██ ██   ██   ██ ██ 
+         ▀▀                        
+________________________________________________________________________
+nano config2
+
+
+
+#!/bin/bash
+echo -e "\e[35m===НАСТРОЙКА ИНТЕРФЕЙСОВ===\e[0m"
+mkdir /etc/net/ifaces/ens18
+echo "BOOTPROTO=static
+TYPE=eth
+DISABLED=no
+CONFIG_IPV4=yes" > /etc/net/ifaces/ens18/options
+echo 172.16.1.2/28 > /etc/net/ifaces/ens18/ipv4address
+echo default via 172.16.1.1 > /etc/net/ifaces/ens18/ipv4route
+mkdir /etc/net/ifaces/ens19
+echo "BOOTPROTO=static
+TYPE=eth
+DISABLED=no
+CONFIG_IPV4=yes" > /etc/net/ifaces/ens19/options
+mkdir /etc/net/ifaces/ens19.100
+echo "BOOTPROTO=static
+TYPE=vlan
+DISABLED=no
+HOST=ens19
+VID=100" > /etc/net/ifaces/ens19.100/options
+echo 192.168.1.1/27 > /etc/net/ifaces/ens19.100/ipv4address
+mkdir /etc/net/ifaces/ens19.200
+echo "BOOTPROTO=static
+TYPE=vlan
+DISABLED=no
+HOST=ens19
+VID=200" > /etc/net/ifaces/ens19.200/options
+echo 192.168.2.1/24 > /etc/net/ifaces/ens19.200/ipv4address
+mkdir /etc/net/ifaces/ens19.999
+echo "BOOTPROTO=static
+TYPE=vlan
+DISABLED=no
+HOST=ens19
+VID=999" > /etc/net/ifaces/ens19.999/options
+echo 192.168.99.1/29 > /etc/net/ifaces/ens19.999/ipv4address
+modprobe 8021q
+sed -i "s/net.ipv4.ip_forward = 0/net.ipv4.ip_forward = 1/" "/etc/net/sysctl.conf"
+systemctl restart network
+echo -e "\e[35m=== ПРОВЕРКА ИНТЕРФЕЙСОВ И ПИНГ ===\e[0m"
+ip -c -br a
+ping -c 4 8.8.8.8
+ping -c 4 ya.ru
+echo -e "\e[35m=== УСТАНОВКА IPTABLES ===\e[0m"
+apt-get update
+apt-get install iptables -y
+iptables -t nat -A POSTROUTING -o ens18 -j MASQUERADE
+iptables-save > /etc/sysconfig/iptables
+systemctl enable --now iptables
+echo -e "\e[35m=== НАСТРОЙКА ТУННЕЛЕЙ ===\e[0m"
+#TUNNEL
+mkdir /etc/net/ifaces/iptunnel
+echo "10.0.0.1/28" > /etc/net/ifaces/iptunnel/ipv4address
+echo "TYPE=iptun
+TUNTYPE=gre
+DISABLED=no
+TUNLOCAL=172.16.1.2
+TUNREMOTE=172.16.2.2
+TUNOPTIONS='ttl 64'" > /etc/net/ifaces/iptunnel/options
+echo "192.168.3.0/28 via 10.0.0.2" > /etc/net/ifaces/iptunnel/ipv4route
+ip -c -br a
+echo -e "\e[35m=== ПРОВЕРКА ТУННЕЛЕЙ ===\e[0m"
+ip tunnel show
+echo -e "\e[35m=== УСТАНОВКА DNSMASQ ===\e[0m"
+apt-get install dnsmasq
+echo "dhcp-range=192.168.2.10,192.168.2.15,999h
+dhcp-option=3,192.168.2.1
+dhcp-option=6,192.168.1.2
+dhcp-option=15,au-team.irpo
+interface=ens19.200" > /etc/dnsmasq.conf
+systemctl restart dnsmasq
+echo "nameserver 8.8.8.8" > /etc/resolv.conf
+echo -e "\e[35m=== ПРОВЕРКА ИНТЕРФЕЙСОВ И ПИНГ ===\e[0m"
+ip -c -br a
+ping -c 4 8.8.8.8
+ping -c 4 ya.ru
+echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
+echo -e "\e[35m===НАСТРОЙКА SSH===\e[0m"
+useradd -m net_admin
+passwd net_admin
+gpasswd -a net_admin wheel
+echo "net_admin ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+apt-get update -y
+apt-get install -y openssh-server
+echo "Authorized access only" > /etc/openssh/banner
+chmod 644 /etc/openssh/banner
+echo "Port 2026
+MaxAuthTries 2
+AllowUsers net_admin
+PermitRootLogin no
+Banner /etc/openssh/banner" > /etc/openssh/sshd_config
+systemctl enable --now sshd
+systemctl restart sshd
+echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
+#!/bin/bash
+echo -e "\e[35m===УСТАНОВКА FRR===\e[0m"
+apt-get update
+apt-get install frr -y
+# Включить OSPF демон
+sed -i 's/ospfd=no/ospfd=yes/' /etc/frr/daemons
+systemctl restart frr
+systemctl enable --now frr
+echo -e "\e[1;32m=== ГОТОВО!!! ОСТАЛОСЬ ТОЛЬКО НАСТРОИТЬ ===\e[0m"
+echo -e "\e[35m===УСТАНОВКА CHRONY===\e[0m"
+apt-get update
+apt-get install -y chrony
+cat > /etc/chrony.conf <<EOF
+driftfile /var/lib/chrony/drift
+server 192.168.44.7 iburst
+makestep 1.0 3
+rtcsync
+EOF
+systemctl enable --now chronyd
+systemctl restart chronyd
+chronyc tracking
+chronyc sources -v
+echo -e "\e[1;32m=== ГОТОВО!!! ===\e[0m"
+set -e
+apt-get update
+apt-get install -y rsyslog
+cat > /usr/local/bin/send-test-log.sh <<'EOF'
+#!/bin/bash
+logger -n 192.168.1.2 -P 514 -d "TEST RSYSLOG FROM $(hostname)"
+EOF
+chmod +x /usr/local/bin/send-test-log.sh
+echo -e "\e[1;32m=== ГОТОВО RSYSLOG CLIENT ===\e[0m"
+echo "Проверка: /usr/local/bin/send-test-log.sh"
+logger -n 192.168.1.2 -P 514 -d "TEST FROM HQ-RTR"
+timedatectl set-timezone Asia/Krasnoyarsk
+hostnamectl hostname hq-rtr.au-team.irpo; exec bash
+                                                           
+▄▄▄▄  ▄▄▄▄      ▄▄▄▄  ▄▄▄▄▄▄ ▄▄▄▄  
+██▄██ ██▄█▄ ▄▄▄ ██▄█▄   ██   ██▄█▄ 
+██▄█▀ ██ ██     ██ ██   ██   ██ ██ 
+________________________________________________________________________
+nano config3
+
+
+
+#!/bin/bash
+echo -e "\e[35m===НАСТРОЙКА ИНТЕРФЕЙСОВ===\e[0m"
+mkdir /etc/net/ifaces/ens18
+echo "BOOTPROTO=static
+TYPE=eth
+DISABLED=no
+CONFIG_IPV4=yes" > /etc/net/ifaces/ens18/options
+echo 172.16.2.2/28 > /etc/net/ifaces/ens18/ipv4address
+echo default via 172.16.2.1 > /etc/net/ifaces/ens18/ipv4route
+mkdir /etc/net/ifaces/ens19
+echo "BOOTPROTO=static
+TYPE=eth
+DISABLED=no
+CONFIG_IPV4=yes" > /etc/net/ifaces/ens19/options
+echo 192.168.3.1/28 > /etc/net/ifaces/ens19/ipv4address
+modprobe 8021q
+sed -i "s/net.ipv4.ip_forward = 0/net.ipv4.ip_forward = 1/" "/etc/net/sysctl.conf"
+systemctl restart network
+echo -e "\e[35m=== ПРОВЕРКА ИНТЕРФЕЙСОВ И ПИНГ ===\e[0m"
+ip -c -br a
+ping -c 4 8.8.8.8
+ping -c 4 ya.ru
+echo -e "\e[35m=== УСТАНОВКА IPTABLES ===\e[0m"
+apt-get update
+apt-get install iptables -y
+iptables -t nat -A POSTROUTING -o ens18 -j MASQUERADE
+iptables-save > /etc/sysconfig/iptables
+systemctl restart iptables
+systemctl enable --now iptables
+echo -e "\e[35m=== НАСТРОЙКА ТУННЕЛЕЙ ===\e[0m"
+#TUNNEL
+mkdir /etc/net/ifaces/iptunnel
+echo "10.0.0.2/28" > /etc/net/ifaces/iptunnel/ipv4address
+echo "TYPE=iptun
+TUNTYPE=gre
+DISABLED=no
+TUNLOCAL=172.16.2.2
+TUNREMOTE=172.16.1.2
+TUNOPTIONS='ttl 64'" > /etc/net/ifaces/iptunnel/options
+echo "192.168.1.0/27 via 10.0.0.1
+192.168.2.0/24 via 10.0.0.1" > /etc/net/ifaces/iptunnel/ipv4route
+ip -c -br a
+echo -e "\e[35m=== ПРОВЕРКА ТУННЕЛЕЙ ===\e[0m"
+ip tunnel show
+echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
+echo -e "\e[35m===НАСТРОЙКА SSH===\e[0m"
+useradd -m net_admin
+passwd net_admin
+gpasswd -a net_admin wheel
+echo "net_admin ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+apt-get update -y
+apt-get install -y openssh-server
+echo "Authorized access only" > /etc/openssh/banner
+chmod 644 /etc/openssh/banner
+echo "Port 2026
+MaxAuthTries 2
+AllowUsers net_admin
+PermitRootLogin no
+Banner /etc/openssh/banner" > /etc/openssh/sshd_config
+systemctl enable --now sshd
+systemctl restart sshd
+echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
+echo -e "\e[35m===УСТАНОВКА FRR===\e[0m"
+apt-get update
+apt-get install frr -y
+sed -i 's/ospfd=no/ospfd=yes/' /etc/frr/daemons
+systemctl enable --now frr
+systemctl restart frr
+echo -e "\e[1;32m=== УСТАНОВКА ВЫПОЛНЕНА!!! ОСТАЛОСЬ ТОЛЬКО НАСТРОИТЬ ===\e[0m"
+echo -e "\e[35m===УСТАНОВКА CHRONY===\e[0m"
+apt-get update
+apt-get install -y chrony
+cat > /etc/chrony.conf <<EOF
+driftfile /var/lib/chrony/drift
+server 192.168.44.7 iburst
+makestep 1.0 3
+rtcsync
+EOF
+systemctl enable --now chronyd
+systemctl restart chronyd
+chronyc tracking
+chronyc sources -v
+echo -e "\e[1;32m=== ГОТОВО!!! ===\e[0m"
+set -e
+apt-get update
+apt-get install -y rsyslog
+cat > /usr/local/bin/send-test-log.sh <<'EOF'
+logger -n 192.168.1.2 -P 514 -d "TEST RSYSLOG FROM $(hostname)"
+EOF
+chmod +x /usr/local/bin/send-test-log.sh
+echo -e "\e[1;32m=== ГОТОВО RSYSLOG CLIENT ===\e[0m"
+echo "Проверка: /usr/local/bin/send-test-log.sh"
+logger -n 192.168.1.2 -P 514 -d "TEST FROM BR-RTR"
+echo "nameserver 8.8.8.8" > /etc/resolv.conf
+timedatectl set-timezone Asia/Krasnoyarsk
+hostnamectl hostname br-rtr.au-team.irpo; exec bash        
+
+▄▄ ▄▄  ▄▄▄       ▄▄▄▄ ▄▄    ▄▄ 
+██▄██ ██▀██ ▄▄▄ ██▀▀▀ ██    ██ 
+██ ██ ▀███▀     ▀████ ██▄▄▄ ██ 
+         ▀▀                    
+________________________________________________________________________
+nano config4
+
+
+
+#!/bin/bash
+echo -e "\e[35m===ИДЕТ КОНФИГУРАЦИЯ DNS===\e[0m"
+echo "nameserver 8.8.8.8
+nameserver 192.168.1.2" > /etc/resolv.conf
+echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
+echo -e "\e[35m===НАСТРОЙКА SSH===\e[0m"
+useradd -m sshuser
+passwd sshuser
+echo "nameserver 8.8.8.8
+nameserver 192.168.1.2" > /etc/resolv.conf
+apt-get update -y
+apt-get install -y openssh-server
+echo "Authorized access only" > /etc/openssh/banner
+chmod 644 /etc/openssh/banner
+echo "Port 2026
+MaxAuthTries 2
+AllowUsers sshuser
+PermitRootLogin no
+Banner /etc/openssh/banner" > /etc/openssh/sshd_config
+systemctl enable --now sshd
+systemctl restart sshd
+echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
+echo -e "\e[35m===УСТАНОВКА CHRONY===\e[0m"
+echo "nameserver 8.8.8.8
+nameserver 192.168.1.2" > /etc/resolv.conf
+apt-get update
+apt-get install -y chrony
+cat > /etc/chrony.conf <<EOF
+driftfile /var/lib/chrony/drift
+server 192.168.44.7 iburst
+makestep 1.0 3
+rtcsync
+EOF
+systemctl enable --now chronyd
+systemctl restart chronyd
+chronyc tracking
+chronyc sources -v
+echo -e "\e[1;32m=== ГОТОВО!!! ===\e[0m"
+timedatectl set-timezone Asia/Krasnoyarsk
+hostnamectl hostname hq-cli.au-team.irpo; exec bash
+
+▄▄ ▄▄  ▄▄▄       ▄▄▄▄ ▄▄▄▄  ▄▄ ▄▄ 
+██▄██ ██▀██ ▄▄▄ ███▄▄ ██▄█▄ ██▄██ 
+██ ██ ▀███▀     ▄▄██▀ ██ ██  ▀█▀      ███████ <----Не забудь заменить на адрес HQ-CLI
+         ▀▀                       
+________________________________________________________________________
+nano config5
+
+
+
+#!/bin/bash
+echo -e "\e[35m===НАСТРОЙКА ИНТЕРФЕЙСОВ===\e[0m"
+mkdir /etc/net/ifaces/ens18
+echo "BOOTPROTO=static
+TYPE=eth
+DISABLED=no
+CONFIG_IPV4=yes" > /etc/net/ifaces/ens18/options
+echo 192.168.1.2/27 > /etc/net/ifaces/ens18/ipv4address
+echo default via 192.168.1.1 > /etc/net/ifaces/ens18/ipv4route
+systemctl restart network
+echo -e "\e[35m=== ПРОВЕРКА ИНТЕРФЕЙСОВ И ПИНГ ===\e[0m"
+ip -c -br a
+ping -c 4 ya.ru
+echo -e "\e[35m=== УСТАНОВКА DNSMASQ ===\e[0m"
+echo "nameserver 8.8.8.8
+nameserver 192.168.1.2" > /etc/resolv.conf
+apt-get update
+apt-get install dnsmasq
+echo "no-resolv
+domain=au-team.irpo
+server=/au-team.irpo/192.168.1.2
+server=8.8.8.8
+interface=ens18
+address=/hq-rtr.au-team.irpo/192.168.1.1
+ptr-record=1.1.168.192.in-addr.arpa,hq-rtr.au-team.irpo
+cname=moodle.au-team.irpo,hq-rtr.au-team.irpo
+cname=wiki.au-team.irpo,hq-rtr.au-team.irpo
+address=/br-rtr.au-team.irpo/192.168.3.1
+ptr-record=1.3.168.192.in-addr.arpa,br-rtr.au-team.irpo
+address=/hq-srv.au-team.irpo/192.168.1.2
+ptr-record=2.1.168.192.in-addr.arpa,hq-srv.au-team.irpo
+address=/hq-cli.au-team.irpo/192.168.2.███████
+ptr-record=███████.2.168.192.in-addr.arpa,hq-cli.au-team.irpo
+address=/br-srv.au-team.irpo/192.168.3.2
+ptr-record=2.3.168.192.in-addr.arpa,br-srv.au-team.irpo" > /etc/dnsmasq.conf
+echo "192.168.1.1	hq-rtr.au-team.irpo" > /etc/hosts
+systemctl restart dnsmasq
+echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
+echo -e "\e[35m===НАСТРОЙКА SSH===\e[0m"
+useradd -m sshuser
+passwd sshuser
+apt-get update -y
+apt-get install -y openssh-server
+echo "Authorized access only" > /etc/openssh/banner
+chmod 644 /etc/openssh/banner
+echo "Port 2026
+MaxAuthTries 2
+AllowUsers sshuser
+PermitRootLogin no
+Banner /etc/openssh/banner" > /etc/openssh/sshd_config
+systemctl enable --now sshd
+systemctl restart sshd
+echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
+echo -e "\e[35m===УСТАНОВКА CHRONY===\e[0m"
+apt-get update
+apt-get install -y chrony
+cat > /etc/chrony.conf <<EOF
+driftfile /var/lib/chrony/drift
+server 192.168.44.7 iburst
+makestep 1.0 3
+rtcsync
+EOF
+systemctl enable --now chronyd
+systemctl restart chronyd
+chronyc tracking
+chronyc sources -v
+echo -e "\e[1;32m=== ГОТОВО!!! ===\e[0m"
+set -e
+echo -e "\e[35m=== УСТАНОВКА MDADM ===\e[0m"
+apt-get update
+apt-get install -y mdadm
+echo -e "\e[35m=== СОЗДАНИЕ RAID 5 ===\e[0m"
+umount /raid5 2>/dev/null || true
+mdadm --stop /dev/md0 2>/dev/null || true
+wipefs -a /dev/sdb /dev/sdc /dev/sdd
+mdadm --create /dev/md0 \
+  --level=5 \
+  --raid-devices=3 \
+  /dev/sdb /dev/sdc /dev/sdd
+echo -e "\e[35m=== ФАЙЛОВАЯ СИСТЕМА ===\e[0m"
+mkfs.ext4 -F /dev/md0
+echo -e "\e[35m=== МОНТИРОВАНИЕ ===\e[0m"
+mkdir -p /raid5
+mount /dev/md0 /raid5
+echo -e "\e[35m=== СОХРАНЕНИЕ КОНФИГА ===\e[0m"
+mdadm --detail --scan > /etc/mdadm.conf
+grep -v "/raid5" /etc/fstab > /tmp/fstab.new
+echo "/dev/md0 /raid5 ext4 defaults 0 0" >> /tmp/fstab.new
+cat /tmp/fstab.new > /etc/fstab
+echo -e "\e[35m=== ПРОВЕРКА ===\e[0m"
+cat /proc/mdstat
+mdadm --detail /dev/md0
+df -h /raid5
+echo -e "\e[1;32m=== ГОТОВО RAID 5 ===\e[0m"
+set -e
+apt-get update
+apt-get install -y openssl
+mkdir -p /etc/ssl/CA
+cd /etc/ssl/CA
+openssl genrsa -out ca.key 2048
+openssl req -x509 -new -key ca.key -sha256 -days 365 -out ca.crt \
+  -subj "/C=RU/O=AU-TEAM/CN=HQ-CA"
+cat > web.ext <<EOF
+subjectAltName = DNS:hq-srv.au-team.irpo,DNS:br-srv.au-team.irpo,DNS:hq-rtr.au-team.irpo
+EOF
+openssl genrsa -out web.key 2048
+openssl req -new -key web.key -out web.csr \
+  -subj "/C=RU/O=AU-TEAM/CN=hq-srv.au-team.irpo"
+openssl x509 -req -in web.csr -CA ca.crt -CAkey ca.key \
+  -CAcreateserial -out web.crt -days 365 -sha256 -extfile web.ext
+scp -P 2026 ca.crt sshuser@192.168.2.███████:/tmp/ca.crt
+echo -e "\e[1;32m=== CA И WEB-СЕРТИФИКАТ ГОТОВЫ ===\e[0m"
+set -e
+apt-get update
+apt-get install -y rsyslog
+mkdir -p /var/log/remote
+cat > /etc/rsyslog.d/remote-server.conf <<'EOF'
+$ModLoad imudp
+$UDPServerRun 514
+$template RemoteLogs,"/var/log/remote/%FROMHOST%/%PROGRAMNAME%.log"
+:fromhost-ip, !isequal, "127.0.0.1" ?RemoteLogs
+& stop
+EOF
+systemctl restart rsyslog
+rm -rf /var/log/remote/*
+mkdir -p /var/log/remote
+systemctl enable --now rsyslog
+systemctl restart rsyslog
+echo -e "\e[1;32m=== ГОТОВО RSYSLOG SERVER ===\e[0m"
+timedatectl set-timezone Asia/Krasnoyarsk
+hostnamectl hostname hq-srv.au-team.irpo; exec bash
+ 
+▄▄▄▄  ▄▄▄▄       ▄▄▄▄ ▄▄▄▄  ▄▄ ▄▄ 
+██▄██ ██▄█▄ ▄▄▄ ███▄▄ ██▄█▄ ██▄██ 
+██▄█▀ ██ ██     ▄▄██▀ ██ ██  ▀█▀     ███████ <----Не забудь заменить на адрес HQ-CLI
+________________________________________________________________________
+nano config6
+
+
+
+#!/bin/bash
+echo -e "\e[35m===НАСТРОЙКА ИНТЕРФЕЙСОВ===\e[0m"
+mkdir /etc/net/ifaces/ens18
+echo "BOOTPROTO=static
+TYPE=eth
+DISABLED=no
+CONFIG_IPV4=yes" > /etc/net/ifaces/ens18/options
+echo 192.168.3.2/27 > /etc/net/ifaces/ens18/ipv4address
+echo default via 192.168.3.1 > /etc/net/ifaces/ens18/ipv4route
+systemctl restart network
+echo -e "\e[35m=== ПРОВЕРКА ИНТЕРФЕЙСОВ И ПИНГ ===\e[0m"
+ip -c -br a
+ping -c 4 ya.ru
+echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
+echo -e "\e[35m===НАСТРОЙКА SSH===\e[0m"
+useradd -m sshuser
+passwd sshuser
+apt-get update -y
+apt-get install -y openssh-server
+echo "Authorized access only" > /etc/openssh/banner
+chmod 644 /etc/openssh/banner
+echo "Port 2026
+MaxAuthTries 2
+AllowUsers sshuser
+PermitRootLogin no
+Banner /etc/openssh/banner" > /etc/openssh/sshd_config
+systemctl enable --now sshd
+systemctl restart sshd
+echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
+echo -e "\e[35m===НАСТРОЙКА SSH===\e[0m"
+apt-get update
+apt-get install -y docker-engine docker-compose-v2
+systemctl enable --now docker
+echo "=== ПРОВЕРКА ==="
+systemctl is-active docker
+docker --version
+docker compose version
+echo -e "\e[32m=== ГОТОВО!!! ===\e[0m"
+apt-get install -y samba-common-tools samba-client
+apt-get install -y samba samba-client
+apt-get 
+set -e
+PASS="P@ssw0rd"
+echo -e "\e[35m=== УСТАНОВКА SAMBA ===\e[0m"
+apt-get update
+apt-get install -y samba
+echo "=== СОЗДАНИЕ ГРУППЫ ==="
+groupadd -f hq
+echo -e "\e[35m=== СОЗДАНИЕ ПОЛЬЗОВАТЕЛЕЙ ===\e[0m"
+> /etc/samba/smbusers
+for i in 1 2 3 4 5
+do
+    UNIX_USER="user${i}_hq"
+    SMB_USER="user${i}.hq"
+    id "$UNIX_USER" >/dev/null 2>&1 || useradd -m -s /bin/bash "$UNIX_USER"
+    echo "$UNIX_USER:$PASS" | chpasswd
+    usermod -aG hq "$UNIX_USER"
+    echo "$UNIX_USER = $SMB_USER" >> /etc/samba/smbusers
+    echo -e "$PASS\n$PASS" | smbpasswd -a -s "$UNIX_USER"
+    smbpasswd -e "$UNIX_USER"
+done
+echo -e "\e[35m=== СОЗДАНИЕ КАТАЛОГА ===\e[0m"
+mkdir -p /srv/samba/hq
+chown root:hq /srv/samba/hq
+chmod 2770 /srv/samba/hq
+echo -e "\e[35m=== КОНФИГУРАЦИЯ SAMBA ===\e[0m"
+cp /etc/samba/smb.conf /etc/samba/smb.conf.bak 2>/dev/null || true
+cat > /etc/samba/smb.conf <<EOF
+[global]
+   workgroup = AU-TEAM
+   server string = BR-SRV SMB Server
+   security = user
+   username map = /etc/samba/smbusers
+   map to guest = Bad User
+
+[hq]
+   path = /srv/samba/hq
+   browseable = yes
+   writable = yes
+   valid users = @hq
+   create mask = 0660
+   directory mask = 2770
+EOF
+echo -e "\e[35m=== ЗАПУСК SAMBA ===\e[0m"
+systemctl enable --now smb 2>/dev/null || systemctl enable --now smbd
+systemctl enable --now nmb 2>/dev/null || systemctl enable --now nmbd 2>/dev/null || true
+echo -e "\e[35m=== ПРОВЕРКА ===\e[0m"
+pdbedit -L
+testparm -s
+echo -e "\e[1;32m=== ГОТОВО!!! ===\e[0m"
+echo -e "\e[35m===УСТАНОВКА CHRONY===\e[0m"
+apt-get update
+apt-get install -y chrony
+cat > /etc/chrony.conf <<EOF
+driftfile /var/lib/chrony/drift
+server 192.168.44.7 iburst
+makestep 1.0 3
+rtcsync
+EOF
+systemctl enable --now chronyd
+systemctl restart chronyd
+chronyc tracking
+chronyc sources -v
+echo -e "\e[1;32m=== ГОТОВО!!! ===\e[0m"
+set -e
+echo -e "\e[35m===УСТАНОВКА ANSIBLE===\e[0m"
+apt-get update
+apt-get install -y ansible openssh-clients
+mkdir -p /etc/ansible
+cat > /etc/ansible/hosts <<EOF
+[routers]
+hq-rtr ansible_host=192.168.1.1 ansible_port=2026 ansible_user=net_admin
+br-rtr ansible_host=192.168.3.1 ansible_port=2026 ansible_user=net_admin
+[servers]
+hq-srv ansible_host=192.168.1.2 ansible_port=2026 ansible_user=sshuser
+hq-cli ansible_host=192.168.2.███████ ansible_port=2026 ansible_user=sshuser
+EOF
+cat > /etc/ansible/ansible.cfg <<EOF
+[defaults]
+inventory = /etc/ansible/hosts
+host_key_checking = False
+interpreter_python = /usr/bin/python3
+EOF
+mkdir -p /root/.ssh
+chmod 700 /root/.ssh
+if [ ! -f /root/.ssh/id_rsa ]; then
+    ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa
+fi
+echo -e "\e[35m===КОПИРОВАНИЕ SSH КЛЮЧЕЙ===\e[0m"
+ssh-copy-id -p 2026 net_admin@192.168.1.1
+ssh-copy-id -p 2026 sshuser@192.168.1.2
+ssh-copy-id -p 2026 sshuser@192.168.2.███████
+ssh-copy-id -p 2026 net_admin@192.168.3.1
+echo -e "\e[35m===ПРОВЕРКА ANSIBLE===\e[0m"
+cd /etc/ansible
+ansible all -m ping
+echo -e "\e[1;32m=== ГОТОВО!!! ===\e[0m"
+set -e
+apt-get update
+apt-get install -y rsyslog
+cat > /usr/local/bin/send-test-log.sh <<'EOF'
+logger -n 192.168.1.2 -P 514 -d "TEST RSYSLOG FROM $(hostname)"
+EOF
+chmod +x /usr/local/bin/send-test-log.sh
+echo -e "\e[1;32m=== ГОТОВО RSYSLOG CLIENT ===\e[0m"
+echo "Проверка: /usr/local/bin/send-test-log.sh"
+timedatectl set-timezone Asia/Krasnoyarsk
+hostnamectl hostname br-srv.au-team.irpo; exec bash
+                                     
+▄▄ ▄▄  ▄▄▄      ▄▄▄▄  ▄▄▄▄▄▄ ▄▄▄▄  
+██▄██ ██▀██ ▄▄▄ ██▄█▄   ██   ██▄█▄ 
+██ ██ ▀███▀     ██ ██   ██   ██ ██   Просто вставить в консоль
+         ▀▀                        
+________________________________________________________________________
+
+logger -n 192.168.1.2 -P 514 -d "TEST FROM HQ-RTR"
+vtysh
+conf t
+router ospf
+ network 192.168.1.0/27 area 0
+ network 192.168.2.0/24 area 0
+ network 192.168.99.0/29 area 0
+ network 10.0.0.0/28 area 0
+exit
+exit
+write
+                 
+▄▄▄▄  ▄▄▄▄      ▄▄▄▄  ▄▄▄▄▄▄ ▄▄▄▄  
+██▄██ ██▄█▄ ▄▄▄ ██▄█▄   ██   ██▄█▄ 
+██▄█▀ ██ ██     ██ ██   ██   ██ ██   Просто вставить в консоль
+________________________________________________________________________
+
+logger -n 192.168.1.2 -P 514 -d "TEST FROM BR-RTR"
+vtysh
+conf t
+router ospf
+ network 192.168.3.0/28 area 0
+ network 10.0.0.0/28 area 0
+exit
+exit
+write
+                
+▄▄▄▄  ▄▄▄▄       ▄▄▄▄ ▄▄▄▄  ▄▄ ▄▄ 
+██▄██ ██▄█▄ ▄▄▄ ███▄▄ ██▄█▄ ██▄██ 
+██▄█▀ ██ ██     ▄▄██▀ ██ ██  ▀█▀    Просто вставить в консоль
+________________________________________________________________________
+
+logger -n 192.168.1.2 -P 514 -d "TEST FROM BR-SRV"
+
+
+                                                                                                                                             
+▄▄▄▄▄ ▄▄ ▄▄ ▄▄    ▄▄       ▄▄▄▄ ▄▄ ▄▄ ▄▄▄▄▄  ▄▄▄▄ ▄▄ ▄▄ 
+██▄▄  ██ ██ ██    ██      ██▀▀▀ ██▄██ ██▄▄  ██▀▀▀ ██▄█▀ 
+██    ▀███▀ ██▄▄▄ ██▄▄▄   ▀████ ██ ██ ██▄▄▄ ▀████ ██ ██ 
+
+▄▄▄▄  ▄▄▄▄       ▄▄▄▄ ▄▄▄▄  ▄▄ ▄▄ 
+██▄██ ██▄█▄ ▄▄▄ ███▄▄ ██▄█▄ ██▄██ 
+██▄█▀ ██ ██     ▄▄██▀ ██ ██  ▀█▀       ███████ <----Не забудь заменить на адрес HQ-CLI
+________________________________________________________________________
+nano full_check
+
+
+
+#!/bin/bash
+
+GREEN='\033[1;32m'
+RED='\033[1;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[1;34m'
+PURPLE='\033[1;35m'
+NC='\033[0m'
+
+OK="${GREEN}[ OK ]${NC}"
+FAIL="${RED}[FAIL]${NC}"
+INFO="${BLUE}[INFO]${NC}"
+
+HQ_RTR="192.168.1.1"
+HQ_SRV="192.168.1.2"
+HQ_CLI="192.168.2.███████"
+BR_RTR="192.168.3.1"
+BR_SRV="192.168.3.2"
+ISP_NTP="192.168.44.7"
+
+SSH_PORT="2026"
+
+pause() {
+    echo
+}
+
+header() {
+    echo -e "${PURPLE}"
+    echo "=================================================="
+    echo " $1"
+    echo "=================================================="
+    echo -e "${NC}"
+}
+
+check_cmd() {
+    NAME="$1"
+    CMD="$2"
+
+    echo -ne "${YELLOW}$NAME ... ${NC}"
+    if bash -c "$CMD" >/tmp/check.out 2>/tmp/check.err; then
+        echo -e "$OK"
+    else
+        echo -e "$FAIL"
+        cat /tmp/check.err
+    fi
+}
+
+header "IP / CONNECTIVITY"
+
+check_cmd "Ping HQ-RTR" "ping -c 2 $HQ_RTR"
+check_cmd "Ping HQ-SRV" "ping -c 2 $HQ_SRV"
+check_cmd "Ping HQ-CLI" "ping -c 2 $HQ_CLI"
+check_cmd "Ping BR-RTR" "ping -c 2 $BR_RTR"
+check_cmd "Ping BR-SRV" "ping -c 2 $BR_SRV"
+check_cmd "Ping Internet 8.8.8.8" "ping -c 2 8.8.8.8"
+
+pause
+header "DNS"
+
+check_cmd "DNS resolve ya.ru" "getent hosts ya.ru"
+
+pause
+header "GRE TUNNEL"
+
+check_cmd "Ping GRE BR-RTR 10.0.0.2" "ping -c 2 10.0.0.2"
+check_cmd "Show tunnel interfaces" "ip tunnel show"
+
+pause
+header "SSH"
+
+check_cmd "SSH HQ-RTR" "ssh -o BatchMode=yes -o ConnectTimeout=5 -p $SSH_PORT net_admin@$HQ_RTR hostname"
+check_cmd "SSH HQ-SRV" "ssh -o BatchMode=yes -o ConnectTimeout=5 -p $SSH_PORT sshuser@$HQ_SRV hostname"
+check_cmd "SSH HQ-CLI" "ssh -o BatchMode=yes -o ConnectTimeout=5 -p $SSH_PORT sshuser@$HQ_CLI hostname"
+check_cmd "SSH BR-RTR" "ssh -o BatchMode=yes -o ConnectTimeout=5 -p $SSH_PORT net_admin@$BR_RTR hostname"
+
+pause
+header "ANSIBLE"
+
+check_cmd "Ansible ping all" "cd /etc/ansible && ansible all -m ping"
+
+pause
+header "FRR / OSPF"
+
+check_cmd "FRR HQ-RTR status" "ssh -p $SSH_PORT net_admin@$HQ_RTR 'systemctl is-active frr'"
+check_cmd "FRR BR-RTR status" "ssh -p $SSH_PORT net_admin@$BR_RTR 'systemctl is-active frr'"
+
+check_cmd "OSPF HQ-RTR neighbors" "ssh -p $SSH_PORT net_admin@$HQ_RTR \"vtysh -c 'show ip ospf neighbor'\""
+check_cmd "OSPF BR-RTR neighbors" "ssh -p $SSH_PORT net_admin@$BR_RTR \"vtysh -c 'show ip ospf neighbor'\""
+
+check_cmd "OSPF HQ-RTR routes" "ssh -p $SSH_PORT net_admin@$HQ_RTR \"vtysh -c 'show ip route ospf'\""
+check_cmd "OSPF BR-RTR routes" "ssh -p $SSH_PORT net_admin@$BR_RTR \"vtysh -c 'show ip route ospf'\""
+
+pause
+header "DOCKER"
+
+check_cmd "Docker service" "systemctl is-active docker"
+check_cmd "Docker version" "docker --version"
+check_cmd "Docker Compose version" "docker compose version"
+
+pause
+header "SAMBA"
+
+check_cmd "Samba service smb" "systemctl is-active smb"
+check_cmd "Samba share list" "smbclient -L localhost -U user1.hq%P@ssw0rd"
+check_cmd "Samba connect hq share" "smbclient //localhost/hq -U user1.hq%P@ssw0rd -c 'ls'"
+
+pause
+header "CHRONY / NTP"
+
+check_cmd "Chronyd service" "systemctl is-active chronyd"
+check_cmd "Chrony tracking" "chronyc tracking"
+check_cmd "Chrony sources" "chronyc sources -v"
+
+pause
+header "CERTIFICATE"
+
+check_cmd "CA certificate exists on HQ-SRV" "ssh -p $SSH_PORT sshuser@$HQ_SRV 'test -f /etc/ssl/CA/ca.crt'"
+check_cmd "WEB certificate exists on HQ-SRV" "ssh -p $SSH_PORT sshuser@$HQ_SRV 'test -f /etc/ssl/CA/web.crt'"
+check_cmd "Certificate dates" "ssh -p $SSH_PORT sshuser@$HQ_SRV 'openssl x509 -in /etc/ssl/CA/web.crt -noout -issuer -subject -dates'"
+
+pause
+header "FINAL RESULT"
+
+echo -e "${GREEN}=== ПРОВЕРКА ЗАВЕРШЕНА ===${NC}"
+echo -e "${YELLOW}Если напротив всех пунктов [ OK ], стенд готов к сдаче.${NC}"
+
+
+
+                       
+▄▄ ▄▄  ▄▄▄       ▄▄▄▄ ▄▄▄▄  ▄▄ ▄▄ 
+██▄██ ██▀██ ▄▄▄ ███▄▄ ██▄█▄ ██▄██ 
+██ ██ ▀███▀     ▄▄██▀ ██ ██  ▀█▀  
+         ▀▀                       
+______________________________________________________________________________________________________
+nano full_check
+
+
+
+#!/bin/bash
+
+GREEN='\033[1;32m'
+RED='\033[1;31m'
+YELLOW='\033[1;33m'
+PURPLE='\033[1;35m'
+NC='\033[0m'
+
+OK="${GREEN}[ OK ]${NC}"
+FAIL="${RED}[FAIL]${NC}"
+
+check() {
+    echo -ne "${YELLOW}$1 ... ${NC}"
+    if bash -c "$2" >/tmp/check.out 2>/tmp/check.err; then
+        echo -e "$OK"
+    else
+        echo -e "$FAIL"
+        cat /tmp/check.err
+    fi
+}
+
+header() {
+    echo -e "${PURPLE}"
+    echo "=========================================="
+    echo " $1"
+    echo "=========================================="
+    echo -e "${NC}"
+}
+
+header "DNS CHECK"
+
+check "Resolve ya.ru" "getent hosts ya.ru"
+check "Resolve hq-srv.au-team.irpo" "getent hosts hq-srv.au-team.irpo"
+check "Resolve br-srv.au-team.irpo" "getent hosts br-srv.au-team.irpo"
+
+header "RAID5 CHECK"
+
+check "md0 exists" "test -b /dev/md0"
+check "RAID level raid5" "mdadm --detail /dev/md0 | grep 'Raid Level : raid5'"
+check "RAID state clean" "mdadm --detail /dev/md0 | grep 'State : clean'"
+check "RAID active devices 3" "mdadm --detail /dev/md0 | grep 'Active Devices : 3'"
+check "RAID mounted /raid5" "mount | grep '/raid5'"
+check "RAID visible in mdstat" "cat /proc/mdstat | grep md0"
+
+header "RSYSLOG CHECK"
+
+check "rsyslog service" "systemctl is-active rsyslog"
+check "rsyslog listens UDP 514" "ss -ulnp | grep ':514'"
+check "remote log directory exists" "test -d /var/log/remote"
+check "HQ-RTR logs exist" "find /var/log/remote -type f | grep hq-rtr"
+check "BR-RTR logs exist" "grep -R 'BR-RTR' /var/log/remote >/dev/null"
+check "BR-SRV logs exist" "find /var/log/remote -type f | grep br-srv"
+check "TEST messages exist" "grep -R TEST /var/log/remote >/dev/null"
+
+echo -e "${GREEN}=== ПРОВЕРКА DNS / RAID5 / RSYSLOG ЗАВЕРШЕНА ===${NC}"
+echo -e "${YELLOW}Если напротив всех пунктов [ OK ], стенд готов к сдаче.${NC}"
